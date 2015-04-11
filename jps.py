@@ -294,7 +294,8 @@ def jps(field, start_x, start_y, end_x, end_y):
             queue_jumppoint(_jps_explore_diagonal (pX, pY, -1, -1))
         except FoundPath:
             return _get_path(sources, start_x, start_y, end_x, end_y)
-    return []  # no path is found.
+
+    raise ValueError("No path is found")
     #end of jps
     
 
