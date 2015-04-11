@@ -7,6 +7,8 @@
 # because I wanted to avoid using global variables, which I would have needed because
 # I'm calling functions in an order defined by a priority queue.
 #
+# Not threadsafe if you're using the visual tools. 
+#
 # Using this function: 
 #   - use generate_field(...) to create an 2d array denoting which cells are walkable
 #   - use jps(...) to get paths.
@@ -26,8 +28,10 @@ OBSTACLE = -10
 DESTINATION = -2
 UNINITIALIZED = -1
 
-#expanded = [[False for j in range(150)] for i in range(200)]  # uncomment for visual result 
-#visited = [[False for j in range(150)] for i in range(200)]   # uncomment for visual result 
+DEBUG = False  
+VISUAL = True
+expanded = [[False for j in range(150)] for i in range(200)]  
+visited = [[False for j in range(150)] for i in range(200)]
 
 class FastPriorityQueue():
     """
@@ -86,7 +90,41 @@ def pad_field(field):
         field[i][-1] = OBSTACLE
     for j in range(len(field[0])):
         field[0][j] = OBSTACLE
-        field[-1][j] = OBSTACLE    
+        field[-1][j] = OBSTACLE
+
+def load_obstacle_image(img_name, obstacle_colour=0xFFFFFF):
+    """
+    Loads a field from an image, where the obstacles are marked. PNG or BMP are the best because they're lossless
+    Requires pygame.
+
+    Returns a field that can be used in jps. 
+    
+    img_name - a filename for a .png or .bmp file. 
+    obstacle_colour - the colour that represents obstacles
+    """
+    import pygame
+    image = pygame.surfarray.array2d(pygame.image.load(img_name))
+    obstacle_colour = obstacle_colour - 2 ** 24 # Because it's a signed int and I want an unsigned int.
+
+    return generate_field(image, lambda x:x!=obstacle_colour, pad=True)
+
+def load_path_image(img_name, path_colour=0x000000):
+    """
+    Loads a field from an image where the paths are marked. PNG or BMP are the best.
+    This is pretty much the oopposite of load_obstacle_image. 
+    Requires pygame.
+
+    Returns a field that can be used in jps.
+
+    img_name - a filename for a .png or .bmp file. 
+    obstacle_colour - the colour that represents obstacles
+    """
+    
+    import pygame
+    image = pygame.surfarray.array3d(pygame.image.load(img_name))
+    path_colour = (path_colour // 0x10000, path_colour // 0x100 % 0x100, path_colour % 0x100)
+
+    return generate_field(image, lambda x:(x==path_colour).all(), pad=True)
 
 def jps(field, start_x, start_y, end_x, end_y):
     """
@@ -102,11 +140,15 @@ def jps(field, start_x, start_y, end_x, end_y):
     OR
     [] if no path is found. 
     """
+    global expanded, visited
+    if VISUAL:
+        expanded = [[False for j in range(len(field[0]))] for i in range(len(field))]  
+        visited = [[False for j in range(len(field[0]))] for i in range(len(field))]  
     
     # handle obvious exception cases: either start or end is unreachable
-    if not field[start_x][start_y]:
+    if field[start_x][start_y] == OBSTACLE:
         raise ValueError("No path exists: the start node is not walkable")
-    if not field[end_x][end_y]:
+    if field[end_x][end_y] == OBSTACLE:
         raise ValueError("No path exists: the end node is not walkable")
     
     import queue
@@ -154,12 +196,14 @@ def jps(field, start_x, start_y, end_x, end_y):
 
             if field [cur_x] [cur_y] == UNINITIALIZED:
                 field [cur_x] [cur_y] = curCost
-                #visited [cur_x][cur_y] = True   # uncomment for visual result 
-                sources [cur_x] [cur_y] = startX, startY                
+                sources [cur_x] [cur_y] = startX, startY
+                if VISUAL:
+                    visited [cur_x][cur_y] = True
             elif cur_x == end_x and cur_y == end_y:  # destination found
                 field [cur_x][cur_y] = curCost
-                #visited[cur_x][cur_y] = True  # uncomment for visual result 
                 sources [cur_x] [cur_y] = startX, startY
+                if VISUAL:
+                    visited[cur_x][cur_y] = True
                 raise FoundPath()
             else: #collided with an obstacle. We are done. 
                 return None
@@ -197,12 +241,14 @@ def jps(field, start_x, start_y, end_x, end_y):
 
             if field [cur_x] [cur_y] == UNINITIALIZED:
                 field [cur_x][cur_y] = curCost
-                #visited[cur_x][cur_y] = True  # uncomment for visual result 
                 sources [cur_x] [cur_y] = startX, startY
+                if VISUAL:
+                    visited[cur_x][cur_y] = True  
             elif cur_x == end_x and cur_y == end_y:  # destination found
                 field [cur_x][cur_y] = curCost
-                #visited[cur_x][cur_y] = True    # uncomment for visual result 
                 sources [cur_x] [cur_y] = startX, startY
+                if VISUAL:
+                    visited[cur_x][cur_y] = True
                 raise FoundPath()
             else: #collided with an obstacle or previously explored part. We are done. 
                 return None
@@ -233,7 +279,9 @@ def jps(field, start_x, start_y, end_x, end_y):
     # Main loop: iterate through the queue
     while (not pq.empty()):
         pX, pY = pq.pop_task()
-        #expanded[pX][pY] = True  # uncomment for visual result 
+
+        if VISUAL:
+            expanded[pX][pY] = True 
         
         try:
             queue_jumppoint(_jps_explore_cardinal (pX, pY, 1, 0))
@@ -246,12 +294,12 @@ def jps(field, start_x, start_y, end_x, end_y):
             queue_jumppoint(_jps_explore_diagonal (pX, pY, -1, 1))
             queue_jumppoint(_jps_explore_diagonal (pX, pY, -1, -1))
         except FoundPath:
-            return get_path(sources, start_x, start_y, end_x, end_y)
+            return _get_path(sources, start_x, start_y, end_x, end_y)
     return []  # no path is found.
     #end of jps
     
 
-def get_path(sources, start_x, start_y, end_x, end_y):
+def _get_path(sources, start_x, start_y, end_x, end_y):
     """
     Reconstruct the path from the source information as given by jps(...).
 
@@ -272,6 +320,11 @@ def get_path(sources, start_x, start_y, end_x, end_y):
     result.reverse()
     return [(start_x, start_y)] + result
 
+def _signum(n):
+    if n > 0: return 1
+    elif n < 0: return -1
+    else: return 0
+
 def get_full_path(path):
     """
     Generates the full path from a list of jump points. Assumes that you moved in only one direction between
@@ -283,10 +336,6 @@ def get_full_path(path):
     Return
     a list of 2-tuples (coordinates) starting from the start node and finishing at the end node.
     """
-    def signum(n):
-        if n > 0: return 1
-        elif n < 0: return -1
-        else: return 0
 
     if path == []:
         return []
@@ -295,8 +344,8 @@ def get_full_path(path):
     result = [(cur_x, cur_y)]
     for i in range(len(path) - 1):
         while cur_x != path[i + 1][0] or cur_y != path[i + 1][1]:
-            cur_x += signum(path[i + 1][0] - path[i][0])
-            cur_y += signum(path[i + 1][1] - path[i][1])
+            cur_x += _signum(path[i + 1][0] - path[i][0])
+            cur_y += _signum(path[i + 1][1] - path[i][1])
             result.append((cur_x, cur_y))
     return result
 
@@ -319,7 +368,71 @@ def drawGrid (field):
                 print("{:<3}".format(j), end=" ")
         print("")
 
+def draw_jps(field, path, background=None):
+    """
+    Draw the output of the latest JPS search
+
+    Background: a filename
+    """
+    SCROLL_SPEED = 2
+    import pygame
+#    pygame.init()
+    window = pygame.display.set_mode ((800, 600))
+    main_surface = pygame.Surface ((len(field) * 3, len(field[0]) * 3), flags=pygame.SRCALPHA)
+    main_surface.fill((0, 0, 0, 0))
+
+    black_surface = pygame.Surface ((800, 600))
+    black_surface.fill(0x000000)
+    if background is not None:
+        background = pygame.image.load(background)
+        background = pygame.transform.scale(background, (background.get_width() * 3, background.get_height() * 3))
+
+    for i in range(len(field)):
+        for j in range(len(field[i])):
+            if field[i][j] != OBSTACLE:
+                pygame.draw.rect(main_surface, (0, 255, 0, 100), (i * 3, j * 3, 3, 3)) #valid path cells are green 
+            else:
+                pygame.draw.rect(main_surface, (255, 0, 0, 100), (i * 3, j * 3, 3, 3)) #obstacles are red 
+
+##            if visited[i][j]:
+##                pygame.draw.rect(main_surface, (100, 50, 50, 100), (i * 3, j * 3, 3, 3))  # this could draw the visited cells
+                
+            if expanded[i][j]:
+                pygame.draw.rect(main_surface, (0, 100, 100, 255), (i * 3, j * 3, 3, 3))   #expanded cells are periwinkle
+    for i in path:
+        pygame.draw.rect(main_surface, (0, 255, 0, 255), (i[0] * 3 + 1, i[1] * 3 + 1, 2, 2))  # path is green
+
+    offset_x, offset_y = 0, 0
+    while(True):
+        #handle events
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                quit()
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_SPACE:
+                    offset_x, offset_y = 0, 0
+
+        
+        #handle key events
+        key_events = pygame.key.get_pressed()
+        if key_events [pygame.K_LEFT] or key_events [pygame.K_a]:
+            offset_x += SCROLL_SPEED
+        if key_events [pygame.K_RIGHT] or key_events [pygame.K_d]:
+            offset_x -= SCROLL_SPEED
+        if key_events [pygame.K_UP] or key_events [pygame.K_w]:
+            offset_y += SCROLL_SPEED
+        if key_events [pygame.K_DOWN] or key_events [pygame.K_s]:
+            offset_y -= SCROLL_SPEED
+
+        window.blit(black_surface, (0, 0))
+        if background is not None:
+            window.blit(background, (offset_x, offset_y))
+        window.blit(main_surface, (offset_x, offset_y))
+        pygame.display.flip()
+
 if __name__ == "__main__":
+    import random
+    
     # Simple example
     field = [                       
     [-10, -10, -10, -10, -10, -10, -10, -10, -10, -10], 
@@ -332,54 +445,42 @@ if __name__ == "__main__":
     [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
     [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
     [-10, -10, -10, -10, -10, -10, -10, -10, -10, -10] ]
-    path = jps(field, 3, 2, 9, 9)
-    print("short path", path, "full path", get_full_path(path))
+    path = jps(field, 3, 2, 8, 8)
+    print("short path:", path, "full path:", get_full_path(path))
 
     # Large example:
     DENSITY = 5
-    import cProfile, random, time
-    pr = cProfile.Profile()
-    t = time.time()
+    if DEBUG:
+        import cProfile, time
+        pr = cProfile.Profile()
+        t = time.time()
 
     raw_field = [[random.randint(0, 1000) for i in range(150)] for j in range(200)]
     field = generate_field(raw_field, (lambda cell: True if cell > DENSITY * 10 else False), True)
-    field[1][1] = True
-    field[199][149] = True
-    print("took ", time.time() - t, " to generate field")
-    t = time.time()
-    pr.enable() # start the profiler
-    path = jps(field, 1, 1, 199, 149)
-    pr.disable()
-    print("took ", (time.time() - t), " to do search")
-    t = time.time()
-    path = get_full_path(path)
-    print("full long path: ", path)
-##    pr.print_stats() # uncomment for debug
-##    try:          # uncomment for visual result 
-##        import pygame
-##        pygame.init()
-##        window = pygame.display.set_mode ((600, 500))
-##        main_surface = pygame.Surface ((600, 500))
-##
-##        for i in range(len(field)):
-##            for j in range(len(field[i])):
-##                if field[i][j] == OBSTACLE:
-##                    pygame.draw.rect(main_surface, 0xFFFFFF, (i * 3, j * 3, 3, 3))
-##                else:
-##                    pygame.draw.rect(main_surface, 0x000000, (i * 3, j * 3, 3, 3))
-##
-##                if visited[i][j]:
-##                    pygame.draw.rect(main_surface, 0x884444, (i * 3, j * 3, 3, 3))
-##                    
-##                if expanded[i][j]:
-##                    pygame.draw.rect(main_surface, 0x6666BB, (i * 3, j * 3, 3, 3))
-##        for i in path:
-##            pygame.draw.rect(main_surface, 0x00FF00, (i[0] * 3 + 1, i[1] * 3 + 1, 2, 2))
-##
-##        window.blit(main_surface, (0, 0))
-##        pygame.display.flip()
-##        print("took ", time.time() - t, " to draw")
-##    except ImportError as err:
-##        print("You don't have pygame. Cannot display large test. ", err)
+    field[1][1] = UNINITIALIZED  # guarantee that the end is reachable
+    field[198][148] = UNINITIALIZED 
 
-    
+    if DEBUG:
+        print("took ", time.time() - t, " to generate field")
+        t = time.time()
+        pr.enable() # start the profiler
+        
+    path = jps(field, 1, 1, 198, 148)
+    path = get_full_path(path)
+
+    if DEBUG:
+        pr.disable()
+        print("took ", (time.time() - t), " to do search")
+        t = time.time()
+        print("full long path: ", path)
+        pr.print_stats() 
+
+    if VISUAL:
+        try:
+            draw_jps(field, path)
+        except ImportError as err:
+            print("You don't have pygame. Cannot display large test. ", err)
+
+
+    # load a map froma file
+    m = load_path_image('toronto.png', 0x00ffff); path = get_full_path(jps(m, 40, 20, 607, 310)); draw_jps(m, path, 'toronto.png')
