@@ -7,8 +7,6 @@
 # because I wanted to avoid using global variables, which I would have needed because
 # I'm calling functions in an order defined by a priority queue.
 #
-# Not threadsafe if you're using the visual tools. 
-#
 # Using this function: 
 #   - use generate_field(...) to create an 2d array denoting which cells are walkable
 #   - use jps(...) to get paths.
@@ -19,6 +17,7 @@
 # Christopher Chu, 2015-01-29
 #
 ########################################################################################
+
 __author__ = "Christopher Chu"
 
 import itertools, heapq
@@ -100,11 +99,11 @@ def load_obstacle_image(img_name, obstacle_colour=0xFFFFFF):
     Returns a field that can be used in jps. 
     
     img_name - a filename for a .png or .bmp file. 
-    obstacle_colour - the colour that represents obstacles
+    obstacle_colour - the colour that represents obstacles in form 0xABCDEF
     """
     import pygame
-    image = pygame.surfarray.array2d(pygame.image.load(img_name))
-    obstacle_colour = obstacle_colour - 2 ** 24 # Because it's a signed int and I want an unsigned int.
+    image = pygame.surfarray.array3d(pygame.image.load(img_name))
+    path_colour = (path_colour // 0x10000, path_colour // 0x100 % 0x100, path_colour % 0x100)
 
     return generate_field(image, lambda x:x!=obstacle_colour, pad=True)
 
@@ -117,7 +116,7 @@ def load_path_image(img_name, path_colour=0x000000):
     Returns a field that can be used in jps.
 
     img_name - a filename for a .png or .bmp file. 
-    obstacle_colour - the colour that represents obstacles
+    obstacle_colour - the colour that represents obstacles as an int
     """
     
     import pygame
@@ -376,7 +375,7 @@ def draw_jps(field, path, background=None):
     """
     SCROLL_SPEED = 2
     import pygame
-#    pygame.init()
+    pygame.init()
     window = pygame.display.set_mode ((800, 600))
     main_surface = pygame.Surface ((len(field) * 3, len(field[0]) * 3), flags=pygame.SRCALPHA)
     main_surface.fill((0, 0, 0, 0))
@@ -395,12 +394,12 @@ def draw_jps(field, path, background=None):
                 pygame.draw.rect(main_surface, (255, 0, 0, 100), (i * 3, j * 3, 3, 3)) #obstacles are red 
 
 ##            if visited[i][j]:
-##                pygame.draw.rect(main_surface, (100, 50, 50, 100), (i * 3, j * 3, 3, 3))  # this could draw the visited cells
+##                pygame.draw.rect(main_surface, (100, 50, 50, 100), (i * 3, j * 3, 3, 3))  # this could draw the visited cells, but it messes up the transparencies
                 
             if expanded[i][j]:
                 pygame.draw.rect(main_surface, (0, 100, 100, 255), (i * 3, j * 3, 3, 3))   #expanded cells are periwinkle
     for i in path:
-        pygame.draw.rect(main_surface, (0, 255, 0, 255), (i[0] * 3 + 1, i[1] * 3 + 1, 2, 2))  # path is green
+        pygame.draw.rect(main_surface, (255, 0, 255, 255), (i[0] * 3 + 1, i[1] * 3 + 1, 2, 2))  # path is magenta
 
     offset_x, offset_y = 0, 0
     while(True):
@@ -430,57 +429,3 @@ def draw_jps(field, path, background=None):
         window.blit(main_surface, (offset_x, offset_y))
         pygame.display.flip()
 
-if __name__ == "__main__":
-    import random
-    
-    # Simple example
-    field = [                       
-    [-10, -10, -10, -10, -10, -10, -10, -10, -10, -10], 
-    [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1, -10,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1, -10, -10,  -1,  -1, -10], 
-    [-10,  -1,  -1, -10, -10, -10,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
-    [-10,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, -10], 
-    [-10, -10, -10, -10, -10, -10, -10, -10, -10, -10] ]
-    path = jps(field, 3, 2, 8, 8)
-    print("short path:", path, "full path:", get_full_path(path))
-
-    # Large example:
-    DENSITY = 5
-    if DEBUG:
-        import cProfile, time
-        pr = cProfile.Profile()
-        t = time.time()
-
-    raw_field = [[random.randint(0, 1000) for i in range(150)] for j in range(200)]
-    field = generate_field(raw_field, (lambda cell: True if cell > DENSITY * 10 else False), True)
-    field[1][1] = UNINITIALIZED  # guarantee that the end is reachable
-    field[198][148] = UNINITIALIZED 
-
-    if DEBUG:
-        print("took ", time.time() - t, " to generate field")
-        t = time.time()
-        pr.enable() # start the profiler
-        
-    path = jps(field, 1, 1, 198, 148)
-    path = get_full_path(path)
-
-    if DEBUG:
-        pr.disable()
-        print("took ", (time.time() - t), " to do search")
-        t = time.time()
-        print("full long path: ", path)
-        pr.print_stats() 
-
-    if VISUAL:
-        try:
-            draw_jps(field, path)
-        except ImportError as err:
-            print("You don't have pygame. Cannot display large test. ", err)
-
-
-    # load a map froma file
-    m = load_path_image('toronto.png', 0x00ffff); path = get_full_path(jps(m, 40, 20, 607, 310)); draw_jps(m, path, 'toronto.png')
