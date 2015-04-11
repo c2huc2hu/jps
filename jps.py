@@ -103,9 +103,9 @@ def load_obstacle_image(img_name, obstacle_colour=0xFFFFFF):
     """
     import pygame
     image = pygame.surfarray.array3d(pygame.image.load(img_name))
-    path_colour = (path_colour // 0x10000, path_colour // 0x100 % 0x100, path_colour % 0x100)
+    obstacle_colour = (obstacle_colour // 0x10000, obstacle_colour // 0x100 % 0x100, obstacle_colour % 0x100)
 
-    return generate_field(image, lambda x:x!=obstacle_colour, pad=True)
+    return generate_field(image, lambda x:(x!=obstacle_colour).any(), pad=True) 
 
 def load_path_image(img_name, path_colour=0x000000):
     """
@@ -429,3 +429,10 @@ def draw_jps(field, path, background=None):
         window.blit(main_surface, (offset_x, offset_y))
         pygame.display.flip()
 
+# Turn visual and debug modes on/ off
+def set_visual(val):
+    global VISUAL
+    VISUAL = val
+def set_debug(val):
+    global DEBUG
+    DEBUG = val    
