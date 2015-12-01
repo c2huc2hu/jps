@@ -18,6 +18,8 @@
 #
 ########################################################################################
 
+from __future__ import print_function
+
 __author__ = "Christopher Chu"
 
 import itertools, heapq
@@ -149,8 +151,11 @@ def jps(field, start_x, start_y, end_x, end_y):
         raise ValueError("No path exists: the start node is not walkable")
     if field[end_x][end_y] == OBSTACLE:
         raise ValueError("No path exists: the end node is not walkable")
-    
-    import queue
+
+    try: 
+        import queue 
+    except:
+        import Queue as queue # python 2 compatibility
 
     class FoundPath(Exception):
         """ Raise this when you found a path. it's not really an error,
@@ -363,9 +368,9 @@ def drawGrid (field):
     for i in field: 
         for j in i:
             if j == OBSTACLE:
-                print("###", end=" ")
+                print ("###", end=" ")
             else:
-                print("{:<3}".format(j), end=" ")
+                print ("{:<3}".format(j), end=" ") 
         print("")
 
 def draw_jps(field, path, background=None):
