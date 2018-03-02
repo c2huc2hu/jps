@@ -1,0 +1,28 @@
+Ideas:
+
+Clean up API:
+
+def jps(field, start_x, start_y, end_x, end_y, walkable_fcn) -> JPSResult
+
+class JPSResult:
+    field : int[][]
+    walkable_fcn : (x, y -> bool)
+    preprocessed_field : int[][] (lazily evaluate walkable function)
+    corner_cut : bool
+    pq: PriorityQueue
+
+
+jps(field, start_x, start_y, walkable_fcn, goal_fcn) -> preprocessed_field
+jps(field, start_x, start_y, walkable_fcn, goal_fcn, continue=True) -> preprocessed_field, queue
+
+jps_result.get_jump_point_path(end_x, end_y)
+jps_result.get_full_path(end_x, end_y)
+continue_jps(jps_result, walkable_fcn, goal_fcn, pq=None)
+
+
+OR
+
+constructor: JPS(field, start_x, start_y, walkable_fcn)
+
+* lazily compute the result *
+
