@@ -2,11 +2,11 @@ import unittest
 from jps.jps_refactored import JPSField
 
 OBSTACLE = JPSField.OBSTACLE
-UNINITIALIZED = JPSField.UNINITIALIZED
+WALKABLE = JPSField.WALKABLE
 
 char_to_cell = {
     '#': OBSTACLE,
-    '.': UNINITIALIZED,
+    '.': WALKABLE,
 }
 
 def load_map(file):
@@ -33,9 +33,9 @@ class UtilTests(unittest.TestCase):
     def test_load_map(self):
         "Make sure the loader works"
         tiny_map = [
-            [UNINITIALIZED, UNINITIALIZED, UNINITIALIZED],
-            [OBSTACLE, OBSTACLE, UNINITIALIZED],
-            [UNINITIALIZED, UNINITIALIZED, UNINITIALIZED]]
+            [WALKABLE, WALKABLE, WALKABLE],
+            [OBSTACLE, OBSTACLE, WALKABLE],
+            [WALKABLE, WALKABLE, WALKABLE]]
         self.assertEqual(load_map('test/maps/tiny.map'), tiny_map)
 
     def test_pad_arr(self):

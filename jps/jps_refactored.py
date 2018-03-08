@@ -1,4 +1,5 @@
 from jps.FastPriorityQueue import FastPriorityQueue
+import math
 
 class JPSField:
     UNINITIALIZED, OBSTACLE = -2, -1 # enum
@@ -32,8 +33,11 @@ class JPSField:
         self.goal_set = set()
         self.heuristic_fcn = heuristic_fcn or self._default_heuristic_fcn
 
+        if self._visit_cell(start_x, start_y) == JPSField.OBSTACLE:
+            raise ValueError('Starting cell is not walkable')
         self._enqueue_search(start_x, start_y)
         self.processed_field[start_x][start_y] = 0
+
 
     def _jps(self):
         """
@@ -41,10 +45,9 @@ class JPSField:
         """
         while (not self.pq.empty()):
             px, py = self.pq.pop_task()
-            print('px, py', px, py)
 
             cardinals = ((1,0), (-1,0), (0,1), (0,-1))
-            diagonals = ((1,1), (-1,1), (-1,1), (-1,-1))
+            diagonals = ((1,1), (1,-1), (-1,1), (-1,-1))
 
             # optimization: only need to explore certain directions if the previous direction is known
             for c in cardinals:
@@ -53,40 +56,55 @@ class JPSField:
             for d in diagonals:
                 self._explore_diagonal(px, py, *d)
 
-            if self.processed_field[px][py] > self.goal_cost:
+            if self.processed_field[px][py] >= self.goal_cost:
                 return
 
-        # raise ValueError("No path is found")
+        raise ValueError("No path is found")
 
     def get_jump_point_path(self, goal_set):
-        self.goal_set = goal_set
-        print("goal set", self.goal_set)
+        """ Returns a list of jump points from the start to the goal including both endpoints, where each point will be in a line """
 
-        # TODO: check if the goal has already been checked
-        self._jps()
+        # Verify that a goal is reachable. It may be useful to get a list of all points reachable from the start,
+        # in which case this code should be changed.
+        self.goal_set = {g for g in goal_set if self._visit_cell(*g) != JPSField.OBSTACLE}
+        if not self.goal_set:
+            raise ValueError('No possible goals!')
 
-        print("raw field")
-        print(self.raw_field)
-        print("processed field")
-        print(self.processed_field)
-        print("sources")
-        print(self.parents)
-        print('pq')
-        print(self.pq.pq)
-        print('goal')
-        print(self.goal)
+        # Check if the goal has already been reached. Otherwise try to reach it
+        min_x, min_y = min(goal_set, key=lambda g: self._visit_cell(*g))
+        if self.processed_field[min_x][min_y] != JPSField.WALKABLE:
+            self.goal = min_x, min_y
+            self.goal_cost = self.processed_field[min_x][min_y]
+        else:
+            self._jps()
+
+        # Reconstruct the path
         cur_x, cur_y = self.goal
-
         path = []
         while cur_x != None and cur_y != None:
             path.append((cur_x, cur_y))
-            print("curx, cury", cur_x, cur_y)
             cur_x, cur_y = self.parents[cur_x][cur_y]
-        return path
-
+        return path[::-1]
 
     def get_full_path(self, goal_set):
-        pass
+        """
+        Returns a list of points from the start to the goal including both endpoints, where each point will be one step apart.
+        """
+        path = self.get_jump_point_path(goal_set)
+        cur_x, cur_y = self.goal
+        for i in range(len(path) - 1):
+            dir_x = math.copysign(1, p[i + 1][0] - p[i][0])
+            dir_y = math.copysign(1, p[i + 1][1] - p[i][1])
+
+            path.extend(zip(
+                            range(cur_x, p[i + 1][0] + dir_x, dir_x),
+                            range(cur_y, p[i + 1][1] + dir_y, dir_y)
+                        ))
+        return path[::-1]
+
+    def get_path_length(self, goal_set):
+        self.get_jump_point_path(goal_set)
+        return self.goal_cost
 
     def _explore_cardinal(self, start_x, start_y, dir_x, dir_y):
         cur_x, cur_y = start_x, start_y # indices of current cell
@@ -101,7 +119,6 @@ class JPSField:
                 return None  # TODO: cache this state when enabling resuming search
 
             next_cell_type = self._visit_cell(cur_x, cur_y)
-            print(cur_x, cur_y, next_cell_type)
 
             # Check for obstacles and jump points
             if next_cell_type == JPSField.OBSTACLE:
@@ -118,15 +135,15 @@ class JPSField:
            # Check for jump points
             is_jump_point = False
             if not self.corner_cut:
-                is_jump_point = is_jump_point or dir_x == 0 and (self.processed_field[cur_x + 1][cur_y - dir_y] == JPSField.OBSTACLE
-                                                        or self.processed_field[cur_x - 1][cur_y - dir_y] == JPSField.OBSTACLE)
-                is_jump_point = is_jump_point or dir_y == 0 and (self.processed_field[cur_x - dir_x][cur_y + 1] == JPSField.OBSTACLE
-                                                        or self.processed_field[cur_x - dir_x][cur_y - 1] == JPSField.OBSTACLE)
-            else:
-                is_jump_point = is_jump_point or dir_x == 0 and (self.processed_field[cur_x + 1][cur_y] == JPSField.OBSTACLE
-                                                        or self.processed_field[cur_x - 1][cur_y] == JPSField.OBSTACLE)
-                is_jump_point = is_jump_point or dir_y == 0 and (self.processed_field[cur_x][cur_y + 1] == JPSField.OBSTACLE
-                                                        or self.processed_field[cur_x][cur_y - 1] == JPSField.OBSTACLE)
+                is_jump_point = is_jump_point or dir_x == 0 and (self._visit_cell(cur_x + 1, cur_y - dir_y) == JPSField.OBSTACLE
+                                                        or self._visit_cell(cur_x - 1, cur_y - dir_y) == JPSField.OBSTACLE)
+                is_jump_point = is_jump_point or dir_y == 0 and (self._visit_cell(cur_x - dir_x, cur_y + 1) == JPSField.OBSTACLE
+                                                        or self._visit_cell(cur_x - dir_x, cur_y - 1) == JPSField.OBSTACLE)
+            else:           # TODO: The next cell must also be empty!
+                is_jump_point = is_jump_point or dir_x == 0 and (self._visit_cell(cur_x + 1, cur_y) == JPSField.OBSTACLE
+                                                        or self._visit_cell(cur_x - 1, cur_y) == JPSField.OBSTACLE)
+                is_jump_point = is_jump_point or dir_y == 0 and (self._visit_cell(cur_x, cur_y + 1) == JPSField.OBSTACLE
+                                                        or self._visit_cell(cur_x, cur_y - 1) == JPSField.OBSTACLE)
             if is_jump_point:
                 self._enqueue_search(cur_x, cur_y)
 
@@ -165,22 +182,22 @@ class JPSField:
 
             # Handle the current cell
             next_cell_type = self._visit_cell(cur_x, cur_y)
-            print(cur_x, cur_y, next_cell_type)
 
             # If we reach an obstacle, end this path
             if next_cell_type == JPSField.OBSTACLE:
                 return None
+
             # Cannot move from 1 to 2 if corner cutting is disabled
             # . # 2
             # . 1 .
-            if (not self.corner_cut and (self.processed_field[cur_x - dir_x][cur_y] == JPSField.OBSTACLE or
-                                          self.processed_field[cur_x][cur_y - dir_y] == JPSField.OBSTACLE)):
+            if (not self.corner_cut and (self._visit_cell(cur_x - dir_x, cur_y) == JPSField.OBSTACLE or
+                                          self._visit_cell(cur_x, cur_y - dir_y) == JPSField.OBSTACLE)):
                 return None
             # Cannot move from 1 to 2.
             # . # 2
             # . 1 #
-            if (self.processed_field[cur_x - dir_x][cur_y] == JPSField.OBSTACLE and
-                self.processed_field[cur_x][cur_y - dir_y] == JPSField.OBSTACLE):
+            if (self._visit_cell(cur_x - dir_x, cur_y) == JPSField.OBSTACLE and
+                self._visit_cell(cur_x, cur_y - dir_y) == JPSField.OBSTACLE):
                 return None
 
             # If the next cell has already been explored with lower cost, end this path
@@ -201,8 +218,8 @@ class JPSField:
             # Check if this is a jump point. To reach x from 1, we must go through 2.
             # . . 2 .
             # . 1 # x
-            if self.corner_cut and (self.processed_field[cur_x - dir_x][cur_y] == JPSField.OBSTACLE or
-                                     self.processed_field[cur_x][cur_y - dir_y] == JPSField.OBSTACLE):
+            if self.corner_cut and (self._visit_cell(cur_x - dir_x, cur_y) == JPSField.OBSTACLE or
+                                     self._visit_cell(cur_x, cur_y - dir_y) == JPSField.OBSTACLE):
                 self._enqueue_search(cur_x, cur_y)
 
             # Extend horizontal and vertical searches to check for jumpp points
@@ -229,7 +246,7 @@ class JPSField:
         Returns the type of this cell
         '''
         if self.processed_field[x][y] == JPSField.UNINITIALIZED:
-            if (x, y) in self.goal_set or self.walkable_fcn(x, y, self.raw_field[x][y]):
+            if self.walkable_fcn(x, y, self.raw_field[x][y]):
                 self.processed_field[x][y] = JPSField.WALKABLE
             else:
                 self.processed_field[x][y] = JPSField.OBSTACLE
