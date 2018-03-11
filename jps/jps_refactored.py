@@ -1,5 +1,14 @@
 from jps.FastPriorityQueue import FastPriorityQueue
 import math
+from itertools import repeat
+
+def signum(x):
+    if x == 0:
+        return 0
+    elif x > 0:
+        return 1
+    else:
+        return -1
 
 class JPSField:
     UNINITIALIZED, OBSTACLE = -2, -1 # enum
@@ -91,16 +100,26 @@ class JPSField:
         Returns a list of points from the start to the goal including both endpoints, where each point will be one step apart.
         """
         path = self.get_jump_point_path(goal_set)
-        cur_x, cur_y = self.goal
+        result = []
         for i in range(len(path) - 1):
-            dir_x = math.copysign(1, p[i + 1][0] - p[i][0])
-            dir_y = math.copysign(1, p[i + 1][1] - p[i][1])
+            cur_x, cur_y = path[i]
+            dir_x = signum(path[i + 1][0] - cur_x)
+            dir_y = signum(path[i + 1][1] - cur_y)
 
-            path.extend(zip(
-                            range(cur_x, p[i + 1][0] + dir_x, dir_x),
-                            range(cur_y, p[i + 1][1] + dir_y, dir_y)
-                        ))
-        return path[::-1]
+            if dir_x == 0:
+                xs = repeat(cur_x)
+            else:
+                xs = range(cur_x, path[i+1][0], dir_x)
+            if dir_y == 0:
+                ys = repeat(cur_y)
+            else:
+                ys = range(cur_y, path[i+1][1], dir_y)
+
+            result.extend(zip(xs, ys))
+
+        # add the final step to the path
+        result.append(path[-1])
+        return result
 
     def get_path_length(self, goal_set):
         self.get_jump_point_path(goal_set)

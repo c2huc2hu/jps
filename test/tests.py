@@ -22,14 +22,13 @@ class JPSTinyTests(unittest.TestCase):
         self.assertEqual(0, self.j.get_path_length({(1, 1)}))
 
     def test_corner_cut(self):
-        print("start corner cut")
         corner_cut_result = jps.JPSField(self.map, 1, 1, corner_cut=True, diagonal_cost=1.4)
-        print(corner_cut_result.get_jump_point_path({(3, 1)}))
-        print(corner_cut_result.processed_field)
-        print("middle of corner cut")
         self.assertEqual(corner_cut_result.get_path_length({(3, 1)}), 2 + 2 * 1.4)
-        print("end corner cut")
+        self.assertEqual(corner_cut_result.get_jump_point_path({(3, 1)}), [(1, 1), (1, 2), (2, 3), (3, 2), (3, 1)])
+        self.assertEqual(corner_cut_result.get_full_path({(3, 1)}), [(1, 1), (1, 2), (2, 3), (3, 2), (3, 1)])
 
     def test_no_corner_cut(self):
         no_corner_cut_result = jps.JPSField(self.map, 1, 1, corner_cut=False)
         self.assertEqual(no_corner_cut_result.get_path_length({(3, 1)}), 6)
+        self.assertEqual(no_corner_cut_result.get_full_path({(3, 1)}), [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 2), (3, 1)])
+        self.assertEqual(no_corner_cut_result.get_jump_point_path({(3, 1)}), [(1, 1), (1, 3), (3, 3), (3, 1)])
