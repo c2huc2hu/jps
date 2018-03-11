@@ -32,3 +32,8 @@ class JPSTinyTests(unittest.TestCase):
         self.assertEqual(no_corner_cut_result.get_path_length({(3, 1)}), 6)
         self.assertEqual(no_corner_cut_result.get_full_path({(3, 1)}), [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 2), (3, 1)])
         self.assertEqual(no_corner_cut_result.get_jump_point_path({(3, 1)}), [(1, 1), (1, 3), (3, 3), (3, 1)])
+
+    def test_resumable(self):
+        resumable_j = jps.JPSField(self.map, 1, 1, resumable=True)
+        resumable_j.get_jump_point_path({(1, 3)})
+        resumable_j.get_jump_point_path({(3, 3)})

@@ -16,7 +16,8 @@ class JPSField:
 
     def __init__(self, raw_field, start_x, start_y,
                  corner_cut=False, diagonal_cost=1.414,
-                 walkable_fcn=None, heuristic_fcn=None):
+                 walkable_fcn=None, heuristic_fcn=None,
+                 resumable=False):
 
         '''
         Create a field to be processed by jump point search
@@ -27,11 +28,13 @@ class JPSField:
         diagonal_cost    - cost to move diagonally. Must be between 1 and 2 inclusive.
         walkable_fcn     - f(x, y, cell) -> bool. Defaults to raw_field[x][y] == JPSField.WALKABLE
         heuristic_fcn    - f(x, y, start_x, start_y, cell) -> float. Defaults to the minimum calculated from diagonal_cost and the absolute distances.
+        resumable        - whether another search can be calculated using the result of the current search. adds runtime and memory.
         '''
         self.raw_field = raw_field
         self.processed_field = [[JPSField.UNINITIALIZED for x in row] for row in raw_field]        # a copy of field for caching
         self.parents = [[(None, None) for x in row] for row in raw_field]      # references to the jump point parent of each cell
-        self.pq = FastPriorityQueue()   # priority queue storing jump points and directions that they came from
+        self.pq = FastPriorityQueue()   # priority queue storing jump points that have yet to be explored
+        self.resume_pq = FastPriorityQueue()  # priority queue storing jump points that
 
         self.goal = None, None
         self.goal_cost = float('inf')
@@ -41,12 +44,12 @@ class JPSField:
         self.walkable_fcn = walkable_fcn or JPSField._default_walkable_fcn
         self.goal_set = set()
         self.heuristic_fcn = heuristic_fcn or self._default_heuristic_fcn
+        self.resumable = resumable
 
         if self._visit_cell(start_x, start_y) == JPSField.OBSTACLE:
             raise ValueError('Starting cell is not walkable')
         self._enqueue_search(start_x, start_y)
         self.processed_field[start_x][start_y] = 0
-
 
     def _jps(self):
         """
@@ -134,8 +137,8 @@ class JPSField:
             cur_y += dir_y
             cur_cost += 1
 
-            if cur_cost > self.goal_cost:
-                return None  # TODO: cache this state when enabling resuming search
+            if cur_cost > self.goal_cost and not self.resumable:
+                return None
 
             next_cell_type = self._visit_cell(cur_x, cur_y)
 
@@ -171,7 +174,8 @@ class JPSField:
                 if cur_cost < self.goal_cost:
                     self.goal = (cur_x, cur_y)
                     self.goal_cost = cur_cost
-                return
+                if not self.resumable:
+                    return
 
     def _explore_diagonal(self, start_x, start_y, dir_x, dir_y):
         """
@@ -196,8 +200,8 @@ class JPSField:
 
             # If the cost of reaching this cell is > the cost of this cell, we can stop processing.
             # To resume the search, we will need to cache this result.
-            if cur_cost > self.goal_cost:
-                return None  # TODO: cache this state when enabling resuming search
+            if cur_cost > self.goal_cost and not self.resumable:
+                return None
 
             # Handle the current cell
             next_cell_type = self._visit_cell(cur_x, cur_y)
@@ -232,7 +236,8 @@ class JPSField:
                 if cur_cost < self.goal_cost:
                     self.goal = (cur_x, cur_y)
                     self.goal_cost = cur_cost
-                return # TODO: when enabling resume search, need to cache state here
+                if not self.resumable:
+                    return
 
             # Check if this is a jump point. To reach x from 1, we must go through 2.
             # . . 2 .
