@@ -1,4 +1,4 @@
-from test.test_utils import *
+from test.utils import *
 import jps.jps_refactored as jps
 
 class JPSTinyTests(unittest.TestCase):
@@ -37,3 +37,6 @@ class JPSTinyTests(unittest.TestCase):
         resumable_j = jps.JPSField(self.map, 1, 1, resumable=True)
         resumable_j.get_jump_point_path({(1, 3)})
         resumable_j.get_jump_point_path({(3, 3)})
+
+if __name__ == '__main__':
+    unittest.main()
