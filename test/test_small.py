@@ -1,4 +1,7 @@
-from test.utils import *
+try:
+    from test.utils import *
+except:
+    from utils import *
 import jps.jps_refactored as jps
 
 class JPSSmallTests(unittest.TestCase):
@@ -19,5 +22,5 @@ class JPSSmallTests(unittest.TestCase):
         self.assertEqual(corner_cut_result.get_path_length({(1, 2)}), 3 * 1.5)
 
         no_corner_cut_result = jps.JPSField(clip_map, 2, 1, corner_cut=False)
-        self.assertEqual(no_corner_cut_result.get_path_length({1, 2}), 6)
+        self.assertEqual(no_corner_cut_result.get_path_length({(1, 2)}), 6)
 

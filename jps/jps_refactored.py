@@ -61,7 +61,7 @@ class JPSField:
             cardinals = ((1,0), (-1,0), (0,1), (0,-1))
             diagonals = ((1,1), (1,-1), (-1,1), (-1,-1))
 
-            # optimization: only need to explore certain directions if the previous direction is known
+            # TODO: optimization: only need to explore certain directions if the previous direction is known
             for c in cardinals:
                 self._explore_cardinal(px, py, *c)
 
@@ -71,7 +71,8 @@ class JPSField:
             if self.processed_field[px][py] >= self.goal_cost:
                 return
 
-        raise ValueError("No path is found")
+        if self.goal_cost == float('inf'):
+            raise ValueError('No path is found')
 
     def get_jump_point_path(self, goal_set):
         """ Returns a list of jump points from the start to the goal including both endpoints, where each point will be in a line """
